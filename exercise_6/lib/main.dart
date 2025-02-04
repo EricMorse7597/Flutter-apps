@@ -24,12 +24,14 @@ class Journal {
   // Converts a Journal into a map. The keys must correspond to the names of the
   // columns in our database
   Map<String, dynamic> toMap() {
+    return {"id": id, "title": title, "content": content};
     // TODO 1: Return a map containing `id`, `title`, and `content` keys with their respective values
   }
 
   // A factory constructor which allows us to make a Journal directly from a map
   // See here for more details on factory constructors: https://dart.dev/language/constructors#factory-constructors
   factory Journal.fromMap(Map<String, dynamic> map) {
+    return Journal(id: map["id"], title: map["title"], content: map["content"]);
     // TODO 2: Return a Journal object by mapping the provided map's keys to the Journal's properties
   }
 }
@@ -51,8 +53,10 @@ Future<void> main() async {
     Directory dataDir = await getApplicationDocumentsDirectory();
     debugPrint('View databases under $dataDir');
   } on MissingPluginException {
-    debugPrint('`getApplicationDocumentsDirectory` is not supported on this platform');
-    debugPrint('For web environments: View databases under CTRL + SHIFT + I (Inspect) > Application > Storage > IndexedDB');
+    debugPrint(
+        '`getApplicationDocumentsDirectory` is not supported on this platform');
+    debugPrint(
+        'For web environments: View databases under CTRL + SHIFT + I (Inspect) > Application > Storage > IndexedDB');
   }
 
   runApp(MyApp());
@@ -87,9 +91,9 @@ class _JournalPageState extends State<JournalPage> {
   List<Journal> _journals = []; // The list of journals from our database
   Journal? _editingJournal; // The journal we're currently editing
 
-  // Handle any required work for the initialization of our page/object. 
+  // Handle any required work for the initialization of our page/object.
   // NOTE: `initState` is only called once when the object is inserted into the tree,
-  // see the official documentation for more details: https://api.flutter.dev/flutter/widgets/State/initState.html 
+  // see the official documentation for more details: https://api.flutter.dev/flutter/widgets/State/initState.html
   @override
   void initState() {
     super.initState();
@@ -98,6 +102,14 @@ class _JournalPageState extends State<JournalPage> {
 
   // Initializes our database
   Future<void> _initializeDatabase() async {
+    _database = await openDatabase(
+      join(await getDatabasesPath(), 'journal_database.db'),
+      onCreate: (db, version) {
+        return db.execute(
+          "CREATE TABLE journals(id INTEGER PRIMARY KEY, title TEXT, content TEXT)",
+        );
+      },
+    );
     // TODO 3: Open a SQLite database and create a table `journals` with columns `id`, `title`, and `content`
     // if it does not exist. The database should be assigned to the variable `_database`
 
@@ -107,7 +119,15 @@ class _JournalPageState extends State<JournalPage> {
 
   // Loads all journals from our database
   Future<void> _loadJournals() async {
-    // TODO 4: Fetch ALL journal entries from the `journals` table in the database. The entries should be assigned 
+    final db = await _database;
+    final List<Map<String, dynamic>> journals = await db.query('journals');
+    for (final journal in journals) {
+      _journals.add(Journal(
+          id: journal["id"],
+          title: journal["title"],
+          content: journal["content"]));
+    }
+    // TODO 4: Fetch ALL journal entries from the `journals` table in the database. The entries should be assigned
     // to the variable `_journals`. Don't forget to call `setState` to reload the journals
   }
 
@@ -169,70 +189,72 @@ class _JournalPageState extends State<JournalPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Journal App'),
-      ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          children: [
-            // Text field which stores the journal title via `_titleController`
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(labelText: 'Journal Title'),
-            ),
-            SizedBox(height: 8),
-            // Text field which stores the journal content via `_textController`
-            TextField(
-              controller: _textController,
-              decoration: InputDecoration(labelText: 'Journal Content'),
-              onSubmitted: (text) {
-                // TODO 8: Retrieve the title from the text controller and add a journal entry using the title and text
-              },
-            ),
-            SizedBox(height: 16),
-            // Button to add or update a journal depending on the value of `_editingJournal`
-            ElevatedButton(
-              onPressed: () {
-                String title = _titleController.text;
-                String content = _textController.text;
-                _editingJournal == null ? _addJournal(title, content) : _updateJournal(title, content);
-              },
-              child: Text(_editingJournal == null ? 'Add Journal' : 'Update Journal'),
-            ),
-            // List of all journals
-            Expanded(
-              child: ListView.builder(
-                itemCount: _journals.length,
-                itemBuilder: (context, index) {
-                  final journal = _journals[index];
-                  return ListTile(
-                    title: Text(journal.title),
-                    subtitle: Text(journal.content),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Button to start editing a journal
-                        IconButton(
-                          icon: Icon(Icons.edit),
-                          onPressed: () => _startEditing(journal),
-                        ),
-                        // Button to delete a journal
-                        IconButton(
-                          icon: Icon(Icons.delete),
-                          onPressed: () {
-                            // TODO 9: Delete a journal entry using the ID
-                          },
-                        ),
-                      ],
-                    ),
-                  );
+        appBar: AppBar(
+          title: Text('Journal App'),
+        ),
+        body: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              // Text field which stores the journal title via `_titleController`
+              TextField(
+                controller: _titleController,
+                decoration: InputDecoration(labelText: 'Journal Title'),
+              ),
+              SizedBox(height: 8),
+              // Text field which stores the journal content via `_textController`
+              TextField(
+                controller: _textController,
+                decoration: InputDecoration(labelText: 'Journal Content'),
+                onSubmitted: (text) {
+                  // TODO 8: Retrieve the title from the text controller and add a journal entry using the title and text
                 },
               ),
-            ),
-          ],
-        ),
-      )
-    );
+              SizedBox(height: 16),
+              // Button to add or update a journal depending on the value of `_editingJournal`
+              ElevatedButton(
+                onPressed: () {
+                  String title = _titleController.text;
+                  String content = _textController.text;
+                  _editingJournal == null
+                      ? _addJournal(title, content)
+                      : _updateJournal(title, content);
+                },
+                child: Text(
+                    _editingJournal == null ? 'Add Journal' : 'Update Journal'),
+              ),
+              // List of all journals
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _journals.length,
+                  itemBuilder: (context, index) {
+                    final journal = _journals[index];
+                    return ListTile(
+                      title: Text(journal.title),
+                      subtitle: Text(journal.content),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Button to start editing a journal
+                          IconButton(
+                            icon: Icon(Icons.edit),
+                            onPressed: () => _startEditing(journal),
+                          ),
+                          // Button to delete a journal
+                          IconButton(
+                            icon: Icon(Icons.delete),
+                            onPressed: () {
+                              // TODO 9: Delete a journal entry using the ID
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ));
   }
 }
