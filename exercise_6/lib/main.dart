@@ -104,6 +104,7 @@ class _JournalPageState extends State<JournalPage> {
   Future<void> _initializeDatabase() async {
     _database = await openDatabase(
       join(await getDatabasesPath(), 'journal_database.db'),
+      version: 1,
       onCreate: (db, version) {
         return db.execute(
           "CREATE TABLE journals(id INTEGER PRIMARY KEY, title TEXT, content TEXT)",
@@ -119,20 +120,31 @@ class _JournalPageState extends State<JournalPage> {
 
   // Loads all journals from our database
   Future<void> _loadJournals() async {
-    final db = await _database;
+    final db = _database;
     final List<Map<String, dynamic>> journals = await db.query('journals');
+    _journals.clear();
     for (final journal in journals) {
       _journals.add(Journal(
           id: journal["id"],
           title: journal["title"],
           content: journal["content"]));
     }
+
     // TODO 4: Fetch ALL journal entries from the `journals` table in the database. The entries should be assigned
     // to the variable `_journals`. Don't forget to call `setState` to reload the journals
+    setState(() {});
   }
 
   // Adds a new journal in our database
   Future<void> _addJournal(String title, String content) async {
+    Journal toAdd = Journal(title: title, content: content);
+
+    final db = _database;
+    await db.insert(
+      'journals',
+      toAdd.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
     // TODO 5: Create a new Journal object with the given title and content, insert it into the `journals` table in the database.
     // Don't forget to set the generated ID to the new Journal object, or else you will run into a bug!
 
@@ -149,6 +161,15 @@ class _JournalPageState extends State<JournalPage> {
     _editingJournal!.title = title;
     _editingJournal!.content = content;
 
+    final db = _database;
+
+    await db.update(
+      'journals',
+      _editingJournal!.toMap(),
+      where: 'id = ?',
+      whereArgs: [_editingJournal!.id],
+    );
+
     // TODO 6: Update the `journals` table in the database with the current journal's data based on its ID
 
     // Reloads the journals and clears filled in fields by calling `setState`
@@ -158,6 +179,9 @@ class _JournalPageState extends State<JournalPage> {
 
   // Deletes a journal from our database
   Future<void> _deleteJournal(int id) async {
+    final db = _database;
+
+    db.delete('journals', where: 'id = ?', whereArgs: [id]);
     // TODO 7: Delete a journal entry from the `journals` table in the database using the provided ID
 
     // Reloads the journals by calling `setState`
@@ -207,6 +231,7 @@ class _JournalPageState extends State<JournalPage> {
                 controller: _textController,
                 decoration: InputDecoration(labelText: 'Journal Content'),
                 onSubmitted: (text) {
+                  _addJournal(_titleController.text, _textController.text);
                   // TODO 8: Retrieve the title from the text controller and add a journal entry using the title and text
                 },
               ),
@@ -244,6 +269,9 @@ class _JournalPageState extends State<JournalPage> {
                           IconButton(
                             icon: Icon(Icons.delete),
                             onPressed: () {
+                              if (journal.id != null) {
+                                _deleteJournal(journal.id!);
+                              }
                               // TODO 9: Delete a journal entry using the ID
                             },
                           ),
